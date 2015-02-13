@@ -67,8 +67,10 @@ sub one_tick {
 					next unless my $io = $self->{io}{$fd};
 					++$i and $self->_sandbox('Read', $io->{cb}, 0);
 				}
-				next unless $mode & EPOLLOUT && (my $io = $self->{io}{$fd});
-				++$i and $self->_sandbox('Write', $io->{cb}, 1);
+				if ($mode & (EPOLLOUT | EPOLLHUP | EPOLLERR)) {
+					next unless my $io = $self->{io}{$fd};
+					++$i and $self->_sandbox('Write', $io->{cb}, 1);
+				}
 			}
 		}
 		
