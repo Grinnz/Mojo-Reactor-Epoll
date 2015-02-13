@@ -35,6 +35,13 @@ sub io {
 
 sub is_running { !!shift->{running} }
 
+sub new {
+	my $class = shift;
+	my $self = $class->SUPER::new(@_);
+	$self->{epfd} = $self->_epfd;
+	return $self;
+}
+
 sub one_tick {
 	my $self = shift;
 	
@@ -59,7 +66,7 @@ sub one_tick {
 			$maxevents = 10 if $maxevents < 10;
 			
 			return $self->emit(error => "epoll_wait: $!") unless defined
-				(my $res = epoll_wait($self->_epfd, $maxevents, $timeout*1000));
+				(my $res = epoll_wait($self->{epfd}, $maxevents, $timeout*1000));
 			
 			for my $ready (@$res) {
 				my ($fd, $mode) = @$ready;
@@ -102,7 +109,7 @@ sub remove {
 		my $fd = fileno $remove;
 		if (exists $self->{io}{$fd}{in_epoll}) {
 			return $self->emit(error => "epoll_ctl: $!") if
-				epoll_ctl($self->_epfd, EPOLL_CTL_DEL, $fd, 0) < 0;
+				epoll_ctl($self->{epfd}, EPOLL_CTL_DEL, $fd, 0) < 0;
 		}
 		warn "-- Removed IO watcher for $fd\n" if DEBUG;
 		return !!delete $self->{io}{$fd};
@@ -116,6 +123,7 @@ sub reset {
 	my $self = shift;
 	my $epfd = delete $self->{epfd};
 	POSIX::close($epfd) if $epfd;
+	$self->{epfd} = $self->_epfd;
 	delete @{$self}{qw(io timers)};
 }
 
@@ -147,7 +155,7 @@ sub watch {
 	return $self unless defined $op;
 	
 	return $self->emit(error => "epoll_ctl: $!") if
-		epoll_ctl($self->_epfd, $op, $fd, $mode) < 0;
+		epoll_ctl($self->{epfd}, $op, $fd, $mode) < 0;
 	if ($op == EPOLL_CTL_DEL) { delete $io->{in_epoll} }
 	else { $io->{in_epoll} = 1 }
 	
@@ -156,17 +164,15 @@ sub watch {
 
 sub _epfd {
 	my $self = shift;
-	unless (defined $self->{epfd}) {
-		$self->{epfd} = epoll_create(15);
-		if ($self->{epfd} < 0) {
-			if ($! =~ /not implemented/) {
-				die "You need at least Linux 2.5.44 to use Mojo::Reactor::Epoll";
-			} else {
-				die "epoll_create: $!\n";
-			}
+	my $epfd = epoll_create(15);
+	if ($epfd < 0) {
+		if ($! =~ /not implemented/) {
+			die "You need at least Linux 2.5.44 to use Mojo::Reactor::Epoll";
+		} else {
+			die "epoll_create: $!\n";
 		}
 	}
-	return $self->{epfd};
+	return $epfd;
 }
 
 sub _id {
