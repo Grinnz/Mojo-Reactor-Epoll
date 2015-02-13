@@ -27,8 +27,7 @@ sub again {
 sub io {
 	my ($self, $handle, $cb) = @_;
 	my $fd = fileno $handle;
-	$self->remove($handle) if exists $self->{io}{$fd};
-	$self->{io}{$fd} = {cb => $cb};
+	$self->{io}{$fd}{cb} = $cb;
 	warn "-- Set IO watcher for $fd\n" if DEBUG;
 	return $self->watch($handle, 1, 1);
 }
@@ -71,12 +70,12 @@ sub one_tick {
 			for my $ready (@$res) {
 				my ($fd, $mode) = @$ready;
 				if ($mode & (EPOLLIN | EPOLLPRI | EPOLLHUP | EPOLLERR)) {
-					next unless my $io = $self->{io}{$fd};
-					++$i and $self->_sandbox('Read', $io->{cb}, 0);
+					next unless exists $self->{io}{$fd};
+					++$i and $self->_sandbox('Read', $self->{io}{$fd}{cb}, 0);
 				}
 				if ($mode & (EPOLLOUT | EPOLLHUP | EPOLLERR)) {
-					next unless my $io = $self->{io}{$fd};
-					++$i and $self->_sandbox('Write', $io->{cb}, 1);
+					next unless exists $self->{io}{$fd};
+					++$i and $self->_sandbox('Write', $self->{io}{$fd}{cb}, 1);
 				}
 			}
 		}
