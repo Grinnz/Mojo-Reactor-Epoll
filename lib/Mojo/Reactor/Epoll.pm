@@ -60,7 +60,7 @@ sub one_tick {
 		$timeout = 0 if $timeout < 0;
 		
 		# I/O
-		if (my $watched = grep { exists $_->{in_epoll} } values %{$self->{io}}) {
+		if (my $watched = keys %{$self->{io}}) {
 			# Set max events to half the number of descriptors, to a minimum of 10
 			my $maxevents = int $watched/2;
 			$maxevents = 10 if $maxevents < 10;
@@ -123,8 +123,8 @@ sub reset {
 	my $self = shift;
 	my $epfd = delete $self->{epfd};
 	POSIX::close($epfd) if $epfd;
-	$self->{epfd} = $self->_epfd;
 	delete @{$self}{qw(io timers)};
+	$self->{epfd} = $self->_epfd;
 }
 
 sub start {
@@ -146,18 +146,12 @@ sub watch {
 	
 	my $fd = fileno $handle;
 	my $io = $self->{io}{$fd};
-	my $op;
-	if (exists $io->{in_epoll}) {
-		$op = $mode ? EPOLL_CTL_MOD : EPOLL_CTL_DEL;
-	} else {
-		$op = EPOLL_CTL_ADD if $mode;
-	}
+	my $op = exists $io->{in_epoll} ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
 	return $self unless defined $op;
 	
 	return $self->emit(error => "epoll_ctl: $!") if
 		epoll_ctl($self->{epfd}, $op, $fd, $mode) < 0;
-	if ($op == EPOLL_CTL_DEL) { delete $io->{in_epoll} }
-	else { $io->{in_epoll} = 1 }
+	$io->{in_epoll} = 1;
 	
 	return $self;
 }
