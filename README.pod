@@ -1,0 +1,145 @@
+=pod
+
+=head1 NAME
+
+Mojo::Reactor::Epoll - epoll backend for Mojo::Reactor
+
+=head1 SYNOPSIS
+
+  use Mojo::Reactor::Epoll;
+
+  # Watch if handle becomes readable or writable
+  my $reactor = Mojo::Reactor::Epoll->new;
+  $reactor->io($handle => sub {
+    my ($reactor, $writable) = @_;
+    say $writable ? 'Handle is writable' : 'Handle is readable';
+  });
+
+  # Change to watching only if handle becomes writable
+  $reactor->watch($handle, 0, 1);
+
+  # Add a timer
+  $reactor->timer(15 => sub {
+    my $reactor = shift;
+    $reactor->remove($handle);
+    say 'Timeout!';
+  });
+
+  # Start reactor if necessary
+  $reactor->start unless $reactor->is_running;
+
+  # Or in an application using Mojo::IOLoop
+  BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Epoll' }
+  use Mojo::IOLoop;
+
+=head1 DESCRIPTION
+
+L<Mojo::Reactor::Epoll> is an event reactor for L<Mojo::IOLoop> that uses the
+C<epoll(4)> Linux subsystem. The usage is exactly the same as other
+L<Mojo::Reactor> implementations such as L<Mojo::Reactor::Poll>. To set it as
+the default backend for L<Mojo::IOLoop>, set the C<MOJO_REACTOR> environment
+variable to C<Mojo::Reactor::Epoll>. This must be set before L<Mojo::IOLoop> is
+loaded.
+
+=head1 EVENTS
+
+L<Mojo::Reactor::Epoll> inherits all events from L<Mojo::Reactor>.
+
+=head1 METHODS
+
+L<Mojo::Reactor::Epoll> inherits all methods from L<Mojo::Reactor> and
+implements the following new ones.
+
+=head2 again
+
+  $reactor->again($id);
+
+Restart active timer.
+
+=head2 io
+
+  $reactor = $reactor->io($handle => sub {...});
+
+Watch handle for I/O events, invoking the callback whenever handle becomes
+readable or writable.
+
+=head2 is_running
+
+  my $bool = $reactor->is_running;
+
+Check if reactor is running.
+
+=head2 one_tick
+
+  $reactor->one_tick;
+
+Run reactor until an event occurs or no events are being watched anymore. Note
+that this method can recurse back into the reactor, so you need to be careful.
+
+=head2 recurring
+
+  my $id = $reactor->recurring(0.25 => sub {...});
+
+Create a new recurring timer, invoking the callback repeatedly after a given
+amount of time in seconds.
+
+=head2 remove
+
+  my $bool = $reactor->remove($handle);
+  my $bool = $reactor->remove($id);
+
+Remove handle or timer.
+
+=head2 reset
+
+  $reactor->reset;
+
+Remove all handles and timers.
+
+=head2 start
+
+  $reactor->start;
+
+Start watching for I/O and timer events, this will block until L</"stop"> is
+called or no events are being watched anymore.
+
+=head2 stop
+
+  $reactor->stop;
+
+Stop watching for I/O and timer events.
+
+=head2 timer
+
+  my $id = $reactor->timer(0.5 => sub {...});
+
+Create a new timer, invoking the callback after a given amount of time in
+seconds.
+
+=head2 watch
+
+  $reactor = $reactor->watch($handle, $readable, $writable);
+
+Change I/O events to watch handle for with true and false values. Note that
+this method requires an active I/O watcher.
+
+=head1 BUGS
+
+Report any issues on the public bugtracker.
+
+=head1 AUTHOR
+
+Dan Book, C<dbook@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2015, Dan Book.
+
+This library is free software; you may redistribute it and/or modify it under
+the terms of the Artistic License version 2.0.
+
+=head1 SEE ALSO
+
+L<Mojolicious>, L<Mojo::IOLoop>, L<IO::Epoll>
+
+=cut
