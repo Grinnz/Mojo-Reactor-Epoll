@@ -157,7 +157,7 @@ sub watch {
 
 sub _epfd {
 	my $self = shift;
-	my $epfd = epoll_create(15);
+	my $epfd = epoll_create(15); # Size is ignored but must be > 0
 	if ($epfd < 0) {
 		if ($! =~ /not implemented/) {
 			die "You need at least Linux 2.5.44 to use Mojo::Reactor::Epoll";
@@ -238,7 +238,7 @@ Mojo::Reactor::Epoll - epoll backend for Mojo::Reactor
 =head1 DESCRIPTION
 
 L<Mojo::Reactor::Epoll> is an event reactor for L<Mojo::IOLoop> that uses the
-C<epoll(4)> Linux subsystem. The usage is exactly the same as other
+C<epoll(7)> Linux subsystem. The usage is exactly the same as other
 L<Mojo::Reactor> implementations such as L<Mojo::Reactor::Poll>. To set it as
 the default backend for L<Mojo::IOLoop>, set the C<MOJO_REACTOR> environment
 variable to C<Mojo::Reactor::Epoll>. This must be set before L<Mojo::IOLoop> is
