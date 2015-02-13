@@ -146,7 +146,6 @@ sub watch {
 	my $fd = fileno $handle;
 	my $io = $self->{io}{$fd};
 	my $op = exists $io->{in_epoll} ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
-	return $self unless defined $op;
 	
 	return $self->emit(error => "epoll_ctl: $!") if
 		epoll_ctl($self->{epfd}, $op, $fd, $mode) < 0;
