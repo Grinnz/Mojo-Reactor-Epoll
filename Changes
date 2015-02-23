@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.002     2015-02-23 14:00:11-05:00 America/New_York
   - Remove deprecated is_readable method from tests
   - Set default Mojo::Reactor
   - Add hypnotoad example to synopsis
