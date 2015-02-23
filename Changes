@@ -1,4 +1,7 @@
 {{$NEXT}}
+  - Remove deprecated is_readable method from tests
+  - Set default Mojo::Reactor
+  - Add hypnotoad example to synopsis
 
 0.001     2015-02-13 01:57:29-05:00 America/New_York
   - First release

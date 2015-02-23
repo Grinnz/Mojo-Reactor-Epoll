@@ -1,7 +1,5 @@
 use Mojo::Base -strict;
 
-BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Epoll'; }
-
 use Test::More;
 use IO::Socket::INET;
 use Mojo::Reactor::Epoll;
@@ -36,7 +34,6 @@ $reactor->timer(0.025 => sub { shift->stop });
 $reactor->start;
 ok !$readable, 'handle is not readable';
 ok !$writable, 'handle is not writable';
-ok !$reactor->is_readable($listen), 'handle is not readable';
 
 # Connect
 my $client = IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => $port);
@@ -44,7 +41,6 @@ $reactor->timer(1 => sub { shift->stop });
 $reactor->start;
 ok $readable, 'handle is readable';
 ok !$writable, 'handle is not writable';
-ok $reactor->is_readable($listen), 'handle is readable';
 
 # Accept
 my $server = $listen->accept;
@@ -224,15 +220,16 @@ is(Mojo::Reactor::Epoll->detect, 'Mojo::Reactor::Epoll', 'right class');
 # Dummy reactor
 package Mojo::Reactor::Test;
 use Mojo::Base 'Mojo::Reactor::Epoll';
-$ENV{MOJO_REACTOR} = 'Mojo::Reactor::Test';
 
 package main;
 
 # Detection (env)
-is(Mojo::Reactor->detect, 'Mojo::Reactor::Test', 'right class');
+{
+  local $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Test';
+  is(Mojo::Reactor->detect, 'Mojo::Reactor::Test', 'right class');
+}
 
 # Reactor in control
-$ENV{MOJO_REACTOR} = 'Mojo::Reactor::Epoll';
 is ref Mojo::IOLoop->singleton->reactor, 'Mojo::Reactor::Epoll', 'right object';
 ok !Mojo::IOLoop->is_running, 'loop is not running';
 my ($buffer, $server_err, $server_running, $client_err, $client_running);
