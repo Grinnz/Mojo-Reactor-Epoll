@@ -52,14 +52,14 @@ sub one_tick {
 	
 	# Wait for one event
 	my $i;
-	until ($i) {
+	until ($i || !$self->{running}) {
 		# Stop automatically if there is nothing to watch
 		return $self->stop unless keys %{$self->{timers}} || keys %{$self->{io}};
 		
-		# Calculate ideal timeout based on timers
+		# Calculate ideal timeout based on timers and round up to next millisecond
 		my $min = min map { $_->{time} } values %{$self->{timers}};
 		my $timeout = defined $min ? ($min - steady_time) : 0.5;
-		$timeout = 0 if $timeout < 0;
+		$timeout = $timeout <= 0 ? 0 : int($timeout * 1000) + 1;
 		
 		# I/O
 		if (my $watched = keys %{$self->{io}}) {
@@ -68,7 +68,7 @@ sub one_tick {
 			$maxevents = 10 if $maxevents < 10;
 			
 			return $self->emit(error => "epoll_wait: $!") unless defined
-				(my $res = epoll_wait($self->{epfd}, $maxevents, $timeout*1000));
+				(my $res = epoll_wait($self->{epfd}, $maxevents, $timeout));
 			
 			for my $ready (@$res) {
 				my ($fd, $mode) = @$ready;
@@ -84,7 +84,7 @@ sub one_tick {
 		}
 		
 		# Wait for timeout if epoll can't be used
-		elsif ($timeout) { usleep $timeout * 1000000 }
+		elsif ($timeout) { usleep $timeout * 1000 }
 		
 		# Timers (time should not change in between timers)
 		my $now = steady_time;
