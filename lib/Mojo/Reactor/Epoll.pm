@@ -14,7 +14,7 @@ use Time::HiRes 'usleep';
 
 use constant DEBUG => $ENV{MOJO_REACTOR_EPOLL_DEBUG} || 0;
 
-our $VERSION = '0.003';
+our $VERSION = '0.004';
 
 sub DESTROY {
 	my $epfd = delete shift->{epfd};
