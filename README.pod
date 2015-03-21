@@ -59,7 +59,7 @@ implements the following new ones.
 
   $reactor->again($id);
 
-Restart active timer.
+Restart timer. Note that this method requires an active timer.
 
 =head2 io
 

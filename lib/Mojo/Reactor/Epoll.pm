@@ -3,6 +3,7 @@ use Mojo::Base 'Mojo::Reactor';
 
 $ENV{MOJO_REACTOR} ||= 'Mojo::Reactor::Epoll';
 
+use Carp 'croak';
 use IO::Epoll qw(EPOLLERR EPOLLHUP EPOLLIN EPOLLOUT EPOLLPRI
 	EPOLL_CTL_ADD EPOLL_CTL_MOD EPOLL_CTL_DEL
 	epoll_create epoll_ctl epoll_wait);
@@ -22,7 +23,7 @@ sub DESTROY {
 
 sub again {
 	my ($self, $id) = @_;
-	my $timer = $self->{timers}{$id};
+	croak 'Timer not active' unless my $timer = $self->{timers}{$id};
 	$timer->{time} = steady_time + $timer->{after};
 }
 
@@ -108,7 +109,7 @@ sub remove {
 	my ($self, $remove) = @_;
 	if (ref $remove) {
 		my $fd = fileno $remove;
-		if (exists $self->{io}{$fd}{in_epoll}) {
+		if (exists $self->{io}{$fd} and exists $self->{io}{$fd}{in_epoll}) {
 			return $self->emit(error => "epoll_ctl: $!") if
 				epoll_ctl($self->{epfd}, EPOLL_CTL_DEL, $fd, 0) < 0;
 		}
@@ -141,12 +142,13 @@ sub timer { shift->_timer(0, @_) }
 sub watch {
 	my ($self, $handle, $read, $write) = @_;
 	
+	my $fd = fileno $handle;
+	croak 'I/O watcher not active' unless my $io = $self->{io}{$fd};
+	
 	my $mode = 0;
 	$mode |= EPOLLIN | EPOLLPRI if $read;
 	$mode |= EPOLLOUT if $write;
 	
-	my $fd = fileno $handle;
-	my $io = $self->{io}{$fd};
 	my $op = exists $io->{in_epoll} ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
 	
 	return $self->emit(error => "epoll_ctl: $!") if
@@ -263,7 +265,7 @@ implements the following new ones.
 
   $reactor->again($id);
 
-Restart active timer.
+Restart timer. Note that this method requires an active timer.
 
 =head2 io
 
