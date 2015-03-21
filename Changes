@@ -1,5 +1,7 @@
 {{$NEXT}}
-  - Updated again and watch methods to croak on inactive timers
+
+0.003     2015-03-21 15:39:44-04:00 America/New_York
+  - Updated again and watch methods to croak on inactive watchers
 
 0.002     2015-02-23 14:00:11-05:00 America/New_York
   - Remove deprecated is_readable method from tests
