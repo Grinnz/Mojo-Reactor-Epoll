@@ -1,4 +1,5 @@
 {{$NEXT}}
+  - Avoid some floating-point issues in poll timeouts
 
 0.003     2015-03-21 15:39:44-04:00 America/New_York
   - Updated again and watch methods to croak on inactive watchers
