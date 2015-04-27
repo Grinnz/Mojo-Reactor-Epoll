@@ -44,6 +44,13 @@ sub new {
 	return $self;
 }
 
+sub next_tick {
+	my ($self, $cb) = @_;
+	push @{$self->{next_tick}}, $cb;
+	$self->{next_timer} //= $self->timer(0 => \&_next);
+	return undef;
+}
+
 sub one_tick {
 	my $self = shift;
 	
@@ -74,11 +81,11 @@ sub one_tick {
 				my ($fd, $mode) = @$ready;
 				if ($mode & (EPOLLIN | EPOLLPRI | EPOLLHUP | EPOLLERR)) {
 					next unless exists $self->{io}{$fd};
-					++$i and $self->_sandbox('Read', $self->{io}{$fd}{cb}, 0);
+					++$i and $self->_try('I/O watcher', $self->{io}{$fd}{cb}, 0);
 				}
 				if ($mode & (EPOLLOUT | EPOLLHUP | EPOLLERR)) {
 					next unless exists $self->{io}{$fd};
-					++$i and $self->_sandbox('Write', $self->{io}{$fd}{cb}, 1);
+					++$i and $self->_try('I/O watcher', $self->{io}{$fd}{cb}, 1);
 				}
 			}
 		}
@@ -98,7 +105,7 @@ sub one_tick {
 			# Normal timer
 			else { $self->remove($id) }
 			
-			++$i and $self->_sandbox("Timer $id", $t->{cb}) if $t->{cb};
+			++$i and $self->_try('Timer', $t->{cb}) if $t->{cb};
 		}
 	}
 }
@@ -125,7 +132,7 @@ sub reset {
 	my $self = shift;
 	my $epfd = delete $self->{epfd};
 	POSIX::close($epfd) if $epfd;
-	delete @{$self}{qw(io timers)};
+	delete @{$self}{qw(io next_tick next_timer timers)};
 	$self->{epfd} = $self->_epfd;
 }
 
@@ -178,16 +185,10 @@ sub _id {
 	return $id;
 }
 
-sub _io {
-	my ($self, $fd, $writable) = @_;
-	my $io = $self->{io}{$fd};
-	#warn "-- Event fired for IO watcher $fd\n" if DEBUG;
-	$self->_sandbox($writable ? 'Write' : 'Read', $io->{cb}, $writable);
-}
-
-sub _sandbox {
-	my ($self, $event, $cb) = (shift, shift, shift);
-	eval { $self->$cb(@_); 1 } or $self->emit(error => "$event failed: $@");
+sub _next {
+	my $self = shift;
+	delete $self->{next_timer};
+	while (my $cb = shift @{$self->{next_tick}}) { $self->$cb }
 }
 
 sub _timer {
@@ -206,6 +207,11 @@ sub _timer {
 	return $id;
 }
 
+sub _try {
+	my ($self, $what, $cb) = (shift, shift, shift);
+	eval { $self->$cb(@_); 1 } or $self->emit(error => "$what failed: $@");
+}
+
 =head1 NAME
 
 Mojo::Reactor::Epoll - epoll backend for Mojo::Reactor
@@ -216,18 +222,26 @@ Mojo::Reactor::Epoll - epoll backend for Mojo::Reactor
 
   # Watch if handle becomes readable or writable
   my $reactor = Mojo::Reactor::Epoll->new;
-  $reactor->io($handle => sub {
+  $reactor->io($first => sub {
     my ($reactor, $writable) = @_;
-    say $writable ? 'Handle is writable' : 'Handle is readable';
+    say $writable ? 'First handle is writable' : 'First handle is readable';
   });
 
   # Change to watching only if handle becomes writable
-  $reactor->watch($handle, 0, 1);
+  $reactor->watch($first, 0, 1);
+
+  # Turn file descriptor into handle and watch if it becomes readable
+  my $second = IO::Handle->new_from_fd($fd, 'r');
+  $reactor->io($second => sub {
+    my ($reactor, $writable) = @_;
+    say $writable ? 'Second handle is writable' : 'Second handle is readable';
+  })->watch($second, 1, 0);
 
   # Add a timer
   $reactor->timer(15 => sub {
     my $reactor = shift;
-    $reactor->remove($handle);
+    $reactor->remove($first);
+    $reactor->remove($second);
     say 'Timeout!';
   });
 
@@ -279,6 +293,13 @@ readable or writable.
   my $bool = $reactor->is_running;
 
 Check if reactor is running.
+
+=head2 next_tick
+
+  my $undef = $reactor->next_tick(sub {...});
+
+Invoke callback as soon as possible, but not before returning or other
+callbacks that have been registered with this method, always returns C<undef>.
 
 =head2 one_tick
 

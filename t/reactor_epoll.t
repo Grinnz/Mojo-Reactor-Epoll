@@ -133,15 +133,24 @@ ok !$timer, 'timer was not triggered';
 ok $recurring, 'recurring was triggered again';
 
 # Reset
+$reactor->next_tick(sub { die 'Reset failed' });
 $reactor->reset;
 ($readable, $writable, $recurring) = ();
-$reactor->timer(0.025 => sub { shift->stop });
+$reactor->next_tick(sub { shift->stop });
 $reactor->start;
 ok !$readable,  'io event was not triggered again';
 ok !$writable,  'io event was not triggered again';
 ok !$recurring, 'recurring was not triggered again';
 my $reactor2 = Mojo::Reactor::Epoll->new;
 is ref $reactor2, 'Mojo::Reactor::Epoll', 'right object';
+
+# Ordered next tick
+my $result = [];
+for my $i (1 .. 10) {
+  $reactor->next_tick(sub { push @$result, $i });
+}
+$reactor->start;
+is_deeply $result, [1 .. 10], 'right result';
 
 # Reset while watchers are active
 $writable = undef;

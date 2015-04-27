@@ -1,4 +1,5 @@
 {{$NEXT}}
+  - Support sequential next_tick
 
 0.004     2015-04-16 14:43:05 EDT
   - Avoid some floating-point issues in poll timeouts
