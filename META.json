@@ -1,0 +1,65 @@
+{
+   "abstract" : "epoll backend for Mojo::Reactor",
+   "author" : [
+      "Dan Book <dbook@cpan.org>"
+   ],
+   "dynamic_config" : 0,
+   "generated_by" : "Dist::Zilla version 5.035, CPAN::Meta::Converter version 2.150001",
+   "license" : [
+      "artistic_2"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : 2
+   },
+   "name" : "Mojo-Reactor-Epoll",
+   "prereqs" : {
+      "configure" : {
+         "requires" : {
+            "ExtUtils::MakeMaker" : "0"
+         }
+      },
+      "develop" : {
+         "requires" : {
+            "Dist::Zilla::PluginBundle::Author::DBOOK" : "0.003"
+         }
+      },
+      "runtime" : {
+         "requires" : {
+            "Carp" : "0",
+            "IO::Epoll" : "0.03",
+            "List::Util" : "0",
+            "Mojolicious" : "5.70",
+            "POSIX" : "0",
+            "Time::HiRes" : "0",
+            "perl" : "5.010001"
+         }
+      },
+      "test" : {
+         "requires" : {
+            "IO::Socket::INET" : "0",
+            "Test::More" : "0.88"
+         }
+      }
+   },
+   "provides" : {
+      "Mojo::Reactor::Epoll" : {
+         "file" : "lib/Mojo/Reactor/Epoll.pm",
+         "version" : "0.006"
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/Grinnz/Mojo-Reactor-Epoll/issues"
+      },
+      "homepage" : "https://github.com/Grinnz/Mojo-Reactor-Epoll",
+      "repository" : {
+         "type" : "git",
+         "url" : "https://github.com/Grinnz/Mojo-Reactor-Epoll.git",
+         "web" : "https://github.com/Grinnz/Mojo-Reactor-Epoll"
+      }
+   },
+   "version" : "0.006"
+}
+
