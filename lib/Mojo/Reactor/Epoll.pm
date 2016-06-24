@@ -60,8 +60,7 @@ sub one_tick {
 		# Calculate ideal timeout based on timers
 		my $min = min map { $_->{time} } values %{$self->{timers}};
 		my $timeout = defined $min ? ($min - steady_time) : 0.5;
-		#$timeout = $timeout <= 0 ? 0 : int($timeout * 1000) + 1;
-		$timeout = 0 if $timeout <= 0;
+		$timeout = 0 if $timeout < 0;
 		
 		# I/O
 		if (my $watched = keys %{$self->{io}}) {
@@ -69,8 +68,6 @@ sub one_tick {
 			my $maxevents = int $watched/2;
 			$maxevents = 10 if $maxevents < 10;
 			
-			#return $self->emit(error => "epoll_wait: $!") unless defined
-			#	(my $res = epoll_wait($self->{epfd}, $maxevents, $timeout));
 			my $count = $self->{epoll}->wait($maxevents, $timeout);
 			$i += $count if defined $count;
 		}
@@ -101,9 +98,7 @@ sub remove {
 	my ($self, $remove) = @_;
 	if (ref $remove) {
 		my $fd = fileno $remove;
-		if (exists $self->{io}{$fd} and exists $self->{io}{$fd}{in_epoll}) {
-			#return $self->emit(error => "epoll_ctl: $!") if
-			#	epoll_ctl($self->{epfd}, EPOLL_CTL_DEL, $fd, 0) < 0;
+		if (exists $self->{io}{$fd} and exists $self->{io}{$fd}{epoll_cb}) {
 			$self->{epoll}->delete($remove);
 		}
 		warn "-- Removed IO watcher for $fd\n" if DEBUG;
@@ -140,12 +135,10 @@ sub watch {
 	push @events, 'in', 'prio' if $read;
 	push @events, 'out' if $write;
 	
-	my $op = exists $io->{in_epoll} ? 'modify' : 'add';
+	my $op = exists $io->{epoll_cb} ? 'modify' : 'add';
 	
-	#return $self->emit(error => "epoll_ctl: $!") if
-	#	epoll_ctl($self->{epfd}, $op, $fd, $mode) < 0;
 	weaken $self;
-	$self->{epoll}->$op($handle, \@events, sub {
+	my $cb = $io->{epoll_cb} //= sub {
 		my ($events) = @_;
 		if ($events->{in} or $events->{prio} or $events->{hup} or $events->{err}) {
 			return unless exists $self->{io}{$fd};
@@ -155,9 +148,8 @@ sub watch {
 			return unless exists $self->{io}{$fd};
 			$self->_try('I/O watcher', $self->{io}{$fd}{cb}, 1);
 		}
-	});
-	
-	$io->{in_epoll} = 1;
+	};
+	$self->{epoll}->$op($handle, \@events, $cb);
 	
 	return $self;
 }
