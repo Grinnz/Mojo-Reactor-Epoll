@@ -7,7 +7,6 @@ use Carp 'croak';
 use Linux::Epoll;
 use List::Util 'min';
 use Mojo::Util qw(md5_sum steady_time);
-use POSIX ();
 use Scalar::Util 'weaken';
 use Time::HiRes 'usleep';
 

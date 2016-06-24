@@ -1,4 +1,5 @@
 {{$NEXT}}
+  - Remove no-longer-necessary POSIX dependency
 
 0.006     2016-06-23 21:40:36 EDT
   - Switch installer to Module::Build::Tiny
