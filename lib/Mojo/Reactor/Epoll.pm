@@ -138,7 +138,7 @@ sub watch {
 	my $op = exists $io->{epoll_cb} ? 'modify' : 'add';
 	
 	weaken $self;
-	my $cb = $io->{epoll_cb} //= sub {
+	my $cb = $io->{epoll_cb} // sub {
 		my ($events) = @_;
 		if ($events->{in} or $events->{prio} or $events->{hup} or $events->{err}) {
 			return unless exists $self->{io}{$fd};
@@ -150,6 +150,9 @@ sub watch {
 		}
 	};
 	$self->{epoll}->$op($handle, \@events, $cb);
+	
+	# Cache callback for future modify operations, after successfully added to epoll
+	$io->{epoll_cb} //= $cb;
 	
 	return $self;
 }
