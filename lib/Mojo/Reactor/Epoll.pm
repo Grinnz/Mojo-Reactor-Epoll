@@ -4,22 +4,16 @@ use Mojo::Base 'Mojo::Reactor';
 $ENV{MOJO_REACTOR} ||= 'Mojo::Reactor::Epoll';
 
 use Carp 'croak';
-use IO::Epoll qw(EPOLLERR EPOLLHUP EPOLLIN EPOLLOUT EPOLLPRI
-	EPOLL_CTL_ADD EPOLL_CTL_MOD EPOLL_CTL_DEL
-	epoll_create epoll_ctl epoll_wait);
+use Linux::Epoll;
 use List::Util 'min';
 use Mojo::Util qw(md5_sum steady_time);
 use POSIX ();
+use Scalar::Util 'weaken';
 use Time::HiRes 'usleep';
 
 use constant DEBUG => $ENV{MOJO_REACTOR_EPOLL_DEBUG} || 0;
 
 our $VERSION = '0.006';
-
-sub DESTROY {
-	my $epfd = delete shift->{epfd};
-	POSIX::close($epfd) if $epfd;
-}
 
 sub again {
 	my ($self, $id) = @_;
@@ -40,7 +34,7 @@ sub is_running { !!shift->{running} }
 sub new {
 	my $class = shift;
 	my $self = $class->SUPER::new(@_);
-	$self->{epfd} = $self->_epfd;
+	$self->{epoll} = Linux::Epoll->new;
 	return $self;
 }
 
@@ -63,10 +57,11 @@ sub one_tick {
 		# Stop automatically if there is nothing to watch
 		return $self->stop unless keys %{$self->{timers}} || keys %{$self->{io}};
 		
-		# Calculate ideal timeout based on timers and round up to next millisecond
+		# Calculate ideal timeout based on timers
 		my $min = min map { $_->{time} } values %{$self->{timers}};
 		my $timeout = defined $min ? ($min - steady_time) : 0.5;
-		$timeout = $timeout <= 0 ? 0 : int($timeout * 1000) + 1;
+		#$timeout = $timeout <= 0 ? 0 : int($timeout * 1000) + 1;
+		$timeout = 0 if $timeout <= 0;
 		
 		# I/O
 		if (my $watched = keys %{$self->{io}}) {
@@ -74,24 +69,14 @@ sub one_tick {
 			my $maxevents = int $watched/2;
 			$maxevents = 10 if $maxevents < 10;
 			
-			return $self->emit(error => "epoll_wait: $!") unless defined
-				(my $res = epoll_wait($self->{epfd}, $maxevents, $timeout));
-			
-			for my $ready (@$res) {
-				my ($fd, $mode) = @$ready;
-				if ($mode & (EPOLLIN | EPOLLPRI | EPOLLHUP | EPOLLERR)) {
-					next unless exists $self->{io}{$fd};
-					++$i and $self->_try('I/O watcher', $self->{io}{$fd}{cb}, 0);
-				}
-				if ($mode & (EPOLLOUT | EPOLLHUP | EPOLLERR)) {
-					next unless exists $self->{io}{$fd};
-					++$i and $self->_try('I/O watcher', $self->{io}{$fd}{cb}, 1);
-				}
-			}
+			#return $self->emit(error => "epoll_wait: $!") unless defined
+			#	(my $res = epoll_wait($self->{epfd}, $maxevents, $timeout));
+			my $count = $self->{epoll}->wait($maxevents, $timeout);
+			$i += $count if defined $count;
 		}
 		
 		# Wait for timeout if epoll can't be used
-		elsif ($timeout) { usleep $timeout * 1000 }
+		elsif ($timeout) { usleep $timeout * 1000000 }
 		
 		# Timers (time should not change in between timers)
 		my $now = steady_time;
@@ -117,8 +102,9 @@ sub remove {
 	if (ref $remove) {
 		my $fd = fileno $remove;
 		if (exists $self->{io}{$fd} and exists $self->{io}{$fd}{in_epoll}) {
-			return $self->emit(error => "epoll_ctl: $!") if
-				epoll_ctl($self->{epfd}, EPOLL_CTL_DEL, $fd, 0) < 0;
+			#return $self->emit(error => "epoll_ctl: $!") if
+			#	epoll_ctl($self->{epfd}, EPOLL_CTL_DEL, $fd, 0) < 0;
+			$self->{epoll}->delete($remove);
 		}
 		warn "-- Removed IO watcher for $fd\n" if DEBUG;
 		return !!delete $self->{io}{$fd};
@@ -130,10 +116,8 @@ sub remove {
 
 sub reset {
 	my $self = shift;
-	my $epfd = delete $self->{epfd};
-	POSIX::close($epfd) if $epfd;
-	delete @{$self}{qw(io next_tick next_timer timers)};
-	$self->{epfd} = $self->_epfd;
+	delete @{$self}{qw(epoll io next_tick next_timer timers)};
+	$self->{epoll} = Linux::Epoll->new;
 }
 
 sub start {
@@ -152,30 +136,30 @@ sub watch {
 	my $fd = fileno $handle;
 	croak 'I/O watcher not active' unless my $io = $self->{io}{$fd};
 	
-	my $mode = 0;
-	$mode |= EPOLLIN | EPOLLPRI if $read;
-	$mode |= EPOLLOUT if $write;
+	my @events;
+	push @events, 'in', 'prio' if $read;
+	push @events, 'out' if $write;
 	
-	my $op = exists $io->{in_epoll} ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
+	my $op = exists $io->{in_epoll} ? 'modify' : 'add';
 	
-	return $self->emit(error => "epoll_ctl: $!") if
-		epoll_ctl($self->{epfd}, $op, $fd, $mode) < 0;
+	#return $self->emit(error => "epoll_ctl: $!") if
+	#	epoll_ctl($self->{epfd}, $op, $fd, $mode) < 0;
+	weaken $self;
+	$self->{epoll}->$op($handle, \@events, sub {
+		my ($events) = @_;
+		if ($events->{in} or $events->{prio} or $events->{hup} or $events->{err}) {
+			return unless exists $self->{io}{$fd};
+			$self->_try('I/O watcher', $self->{io}{$fd}{cb}, 0);
+		}
+		if ($events->{out} or $events->{hup} or $events->{err}) {
+			return unless exists $self->{io}{$fd};
+			$self->_try('I/O watcher', $self->{io}{$fd}{cb}, 1);
+		}
+	});
+	
 	$io->{in_epoll} = 1;
 	
 	return $self;
-}
-
-sub _epfd {
-	my $self = shift;
-	my $epfd = epoll_create(15); # Size is ignored but must be > 0
-	if ($epfd < 0) {
-		if ($! =~ /not implemented/) {
-			die "You need at least Linux 2.5.44 to use Mojo::Reactor::Epoll";
-		} else {
-			die "epoll_create: $!\n";
-		}
-	}
-	return $epfd;
 }
 
 sub _id {
@@ -398,7 +382,7 @@ the terms of the Artistic License version 2.0.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojo::IOLoop>, L<IO::Epoll>
+L<Mojolicious>, L<Mojo::IOLoop>, L<Linux::Epoll>
 
 =cut
 

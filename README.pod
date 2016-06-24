@@ -186,6 +186,6 @@ the terms of the Artistic License version 2.0.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojo::IOLoop>, L<IO::Epoll>
+L<Mojolicious>, L<Mojo::IOLoop>, L<Linux::Epoll>
 
 =cut
