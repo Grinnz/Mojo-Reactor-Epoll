@@ -236,7 +236,7 @@ Mojo::Reactor::Epoll - epoll backend for Mojo::Reactor
 =head1 DESCRIPTION
 
 L<Mojo::Reactor::Epoll> is an event reactor for L<Mojo::IOLoop> that uses the
-C<epoll(7)> Linux subsystem. The usage is exactly the same as other
+L<epoll(7)> Linux subsystem. The usage is exactly the same as other
 L<Mojo::Reactor> implementations such as L<Mojo::Reactor::Poll>.
 L<Mojo::Reactor::Epoll> will be used as the default backend for L<Mojo::IOLoop>
 if it is loaded before L<Mojo::IOLoop> or any module using the loop. However,
