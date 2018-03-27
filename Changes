@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.007     2018-03-26 21:18:32 EDT
   - Remove no-longer-necessary POSIX dependency
   - Disable use of Net::DNS::Native in tests as recent versions cause test failures
 
