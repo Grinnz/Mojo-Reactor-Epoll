@@ -1,4 +1,5 @@
 {{$NEXT}}
+  - Require Linux::Epoll 0.013 to fix compatibility with tied handles and recent versions of Net::DNS::Native
 
 0.007     2018-03-26 21:18:32 EDT
   - Remove no-longer-necessary POSIX dependency
