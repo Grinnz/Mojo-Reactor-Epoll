@@ -12,7 +12,7 @@ use Time::HiRes 'usleep';
 
 use constant DEBUG => $ENV{MOJO_REACTOR_EPOLL_DEBUG} || 0;
 
-our $VERSION = '0.008';
+our $VERSION = '0.009';
 
 sub again {
 	my ($self, $id) = @_;
