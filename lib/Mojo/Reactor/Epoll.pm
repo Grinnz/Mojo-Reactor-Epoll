@@ -372,9 +372,9 @@ this method requires an active I/O watcher.
 
 The epoll notification facility is exclusive to Linux systems.
 
-The epoll handle is not portable across forks, and this is not currently
-managed for you, though it is not created until the loop is started to allow
-for preforking deployments.
+The epoll handle is not usable across forks, and this is not currently managed
+for you, though it is not created until the loop is started to allow for
+preforking deployments such as L<hypnotoad>.
 
 =head1 BUGS
 
