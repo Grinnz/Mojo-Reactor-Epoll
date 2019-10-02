@@ -197,6 +197,8 @@ sub _try {
 	eval { $self->$cb(@_); 1 } or $self->emit(error => "$what failed: $@");
 }
 
+1;
+
 =head1 NAME
 
 Mojo::Reactor::Epoll - epoll backend for Mojo::Reactor
@@ -366,6 +368,14 @@ this method requires an active I/O watcher.
   # Pause watching for events
   $reactor->watch($handle, 0, 0);
 
+=head1 CAVEATS
+
+The epoll notification facility is exclusive to Linux systems.
+
+The epoll handle is not portable across forks, and this is not currently
+managed for you, though it is not created until the loop is started to allow
+for preforking deployments.
+
 =head1 BUGS
 
 Report any issues on the public bugtracker.
@@ -384,7 +394,3 @@ the terms of the Artistic License version 2.0.
 =head1 SEE ALSO
 
 L<Mojolicious>, L<Mojo::IOLoop>, L<Linux::Epoll>
-
-=cut
-
-1;
