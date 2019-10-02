@@ -105,7 +105,7 @@ sub remove {
 
 sub reset {
 	my $self = shift;
-	delete @{$self}{qw(epoll io next_tick next_timer timers)};
+	delete @{$self}{qw(epoll io next_tick next_timer pending_watch timers)};
 }
 
 sub start {
