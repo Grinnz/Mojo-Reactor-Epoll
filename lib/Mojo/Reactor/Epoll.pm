@@ -30,27 +30,6 @@ sub io {
 
 sub is_running { !!shift->{running} }
 
-sub new {
-	my $class = shift;
-	my $self = $class->SUPER::new(@_);
-	return $self;
-}
-
-sub _create_epoll {
-	my $self = shift;
-
-	$self->{epoll} = Linux::Epoll->new;
-
-	if ($self->{pending_watch}) {
-		foreach my $w (@{$self->{pending_watch}}) {
-			$self->watch(@$w);
-		}
-		delete $self->{pending_watch};
-	}
-
-	return $self->{epoll};
-}
-
 sub next_tick {
 	my ($self, $cb) = @_;
 	push @{$self->{next_tick}}, $cb;
@@ -81,7 +60,7 @@ sub one_tick {
 			my $maxevents = int $watched/2;
 			$maxevents = 10 if $maxevents < 10;
 			
-			my $epoll = $self->{epoll} || $self->_create_epoll;
+			my $epoll = $self->{epoll} // $self->_create_epoll;
 
 			my $count = $epoll->wait($maxevents, $timeout);
 			$i += $count if defined $count;
@@ -146,7 +125,7 @@ sub watch {
 	croak 'I/O watcher not active' unless my $io = $self->{io}{$fd};
 
 	my $epoll = $self->{epoll};
-	unless ($epoll) {
+	unless (defined $epoll) {
 		push @{$self->{pending_watch}}, [$handle, $read, $write];
 		return $self;
 	}
@@ -175,6 +154,13 @@ sub watch {
 	$io->{epoll_cb} //= $cb;
 	
 	return $self;
+}
+
+sub _create_epoll {
+	my $self = shift;
+	$self->{epoll} = Linux::Epoll->new;
+	$self->watch(@$_) for @{delete $self->{pending_watch} // []};
+	return $self->{epoll};
 }
 
 sub _id {
