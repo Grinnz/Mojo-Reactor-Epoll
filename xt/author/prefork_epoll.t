@@ -3,22 +3,20 @@ use Mojo::Base -strict;
 BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Epoll' }
 
 use Test::More;
-use Test::Needs {Mojolicious => '8.25'};
 
-use Mojo::File qw(curfile path tempdir);
+use File::Temp;
 use Mojo::IOLoop::Server;
 use Mojo::Server::Prefork;
 use Mojo::UserAgent;
 
-my $dir  = tempdir;
-my $file = $dir->child('prefork.pid');
+my $dir = File::Temp->newdir;
 
 # Multiple workers and graceful shutdown
 my $port = Mojo::IOLoop::Server::->generate_port;
 my $prefork = Mojo::Server::Prefork->new(
   heartbeat_interval => 0.5,
   listen             => ["http://*:$port"],
-  pid_file           => $file
+  pid_file           => "$dir/prefork.pid",
 );
 $prefork->unsubscribe('request');
 $prefork->on(

@@ -7,4 +7,3 @@ requires 'Scalar::Util';
 requires 'Time::HiRes';
 test_requires 'IO::Socket::INET';
 test_requires 'Test::More' => '0.88';
-test_requires 'Test::Needs';
