@@ -1,5 +1,7 @@
 use Mojo::Base -strict;
 
+BEGIN { $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Epoll' }
+
 use Test::More;
 use IO::Socket::INET;
 use Mojo::Reactor::Epoll;
@@ -228,6 +230,12 @@ $reactor->unsubscribe('error')->on(
 $reactor->timer(0 => sub { die "works!\n" });
 $reactor->start;
 like $err, qr/works!/, 'right error';
+
+# Reset events
+$reactor->on(error => sub { });
+ok $reactor->has_subscribers('error'), 'has subscribers';
+$reactor->reset;
+ok !$reactor->has_subscribers('error'), 'no subscribers';
 
 # Recursion
 $timer   = undef;
