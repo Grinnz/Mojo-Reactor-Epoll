@@ -56,18 +56,12 @@ environment variable to C<Mojo::Reactor::Epoll>.
 
 =head1 EVENTS
 
-L<Mojo::Reactor::Epoll> inherits all events from L<Mojo::Reactor>.
+L<Mojo::Reactor::Epoll> inherits all events from L<Mojo::Reactor::Poll>.
 
 =head1 METHODS
 
-L<Mojo::Reactor::Epoll> inherits all methods from L<Mojo::Reactor> and
+L<Mojo::Reactor::Epoll> inherits all methods from L<Mojo::Reactor::Poll> and
 implements the following new ones.
-
-=head2 again
-
-  $reactor->again($id);
-
-Restart timer. Note that this method requires an active timer.
 
 =head2 io
 
@@ -81,19 +75,6 @@ readable or writable.
     my ($reactor, $writable) = @_;
     say $writable ? 'Handle is writable' : 'Handle is readable';
   });
-
-=head2 is_running
-
-  my $bool = $reactor->is_running;
-
-Check if reactor is running.
-
-=head2 next_tick
-
-  my $undef = $reactor->next_tick(sub {...});
-
-Invoke callback as soon as possible, but not before returning or other
-callbacks that have been registered with this method, always returns C<undef>.
 
 =head2 one_tick
 
@@ -126,22 +107,6 @@ Remove handle or timer.
   $reactor->reset;
 
 Remove all handles and timers.
-
-=head2 start
-
-  $reactor->start;
-
-Start watching for I/O and timer events, this will block until L</"stop"> is
-called or no events are being watched anymore.
-
-  # Start reactor only if it is not running already
-  $reactor->start unless $reactor->is_running;
-
-=head2 stop
-
-  $reactor->stop;
-
-Stop watching for I/O and timer events.
 
 =head2 timer
 

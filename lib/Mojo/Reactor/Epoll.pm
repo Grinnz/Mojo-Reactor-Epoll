@@ -22,7 +22,6 @@ sub io {
 	return $self->watch($handle, 1, 1);
 }
 
-
 sub one_tick {
 	my $self = shift;
 	
