@@ -1,4 +1,5 @@
 {{$NEXT}}
+  - Update IRC metadata to libera.chat
 
 0.010     2020-04-19 21:38:53 EDT
   - Delegate to Mojo::Reactor::Poll again method to support changing invocation
