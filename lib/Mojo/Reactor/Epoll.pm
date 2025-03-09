@@ -5,10 +5,9 @@ $ENV{MOJO_REACTOR} ||= 'Mojo::Reactor::Epoll';
 
 use Carp 'croak';
 use Linux::Epoll;
+use Linux::FD 'timerfd';
 use List::Util 'min';
-use Mojo::Util qw(md5_sum steady_time);
-use Scalar::Util 'weaken';
-use Time::HiRes 'usleep';
+use Scalar::Util qw/refaddr weaken/;
 
 use constant DEBUG => $ENV{MOJO_REACTOR_EPOLL_DEBUG} || 0;
 
@@ -22,6 +21,14 @@ sub io {
 	return $self->watch($handle, 1, 1);
 }
 
+sub again {
+	my ($self, $id, $after) = @_;
+	croak 'Timer not active' unless my $timer = $self->{timers}{$id};
+	$timer->{after} = $after if defined $after;
+	$timer->{fd}->set_timeout($after // $timer->{after});
+	return;
+}
+
 sub one_tick {
 	my $self = shift;
 	
@@ -32,13 +39,8 @@ sub one_tick {
 	my $i;
 	until ($i || !$self->{running}) {
 		# Stop automatically if there is nothing to watch
-		return $self->stop unless keys %{$self->{timers}} || keys %{$self->{io}};
-		
-		# Calculate ideal timeout based on timers
-		my $min = min map { $_->{time} } values %{$self->{timers}};
-		my $timeout = defined $min ? ($min - steady_time) : 0.5;
-		$timeout = 0 if $timeout < 0;
-		
+		return $self->stop unless keys %{$self->{io}};
+
 		# I/O
 		if (my $watched = keys %{$self->{io}}) {
 			# Set max events to half the number of descriptors, to a minimum of 10
@@ -47,31 +49,11 @@ sub one_tick {
 			
 			my $epoll = $self->{epoll} // $self->_create_epoll;
 
-			my $count = $epoll->wait($maxevents, $timeout);
+			my $count = $epoll->wait($maxevents);
 			$i += $count if defined $count;
-		}
-		
-		# Wait for timeout if epoll can't be used
-		elsif ($timeout) { usleep $timeout * 1000000 }
-		
-		# Timers (time should not change in between timers)
-		my $now = steady_time;
-		for my $id (keys %{$self->{timers}}) {
-			next unless my $t = $self->{timers}{$id};
-			next unless $t->{time} <= $now;
-			
-			# Recurring timer
-			if ($t->{recurring}) { $t->{time} = $now + $t->{after} }
-			
-			# Normal timer
-			else { $self->remove($id) }
-			
-			++$i and $self->_try('Timer', $t->{cb}) if $t->{cb};
 		}
 	}
 }
-
-sub recurring { shift->_timer(1, @_) }
 
 sub remove {
 	my ($self, $remove) = @_;
@@ -82,8 +64,9 @@ sub remove {
 		}
 		warn "-- Removed IO watcher for $fd\n" if DEBUG;
 		return !!delete $self->{io}{$fd};
-	} else {
+	} elsif (my $timer = $self->{timers}{$remove}) {
 		warn "-- Removed timer $remove\n" if DEBUG;
+		$self->remove($timer->{fd});
 		return !!delete $self->{timers}{$remove};
 	}
 }
@@ -93,8 +76,6 @@ sub reset {
 	delete @{$self}{qw(epoll pending_watch)};
 	$self->SUPER::reset;
 }
-
-sub timer { shift->_timer(0, @_) }
 
 sub watch {
 	my ($self, $handle, $read, $write) = @_;
@@ -141,24 +122,34 @@ sub _create_epoll {
 	return $self->{epoll};
 }
 
-sub _id {
-	my $self = shift;
-	my $id;
-	do { $id = md5_sum 't' . steady_time . rand } while $self->{timers}{$id};
-	return $id;
-}
-
 sub _timer {
 	my ($self, $recurring, $after, $cb) = @_;
 	
-	my $id = $self->_id;
+	my $timerfd = timerfd('monotonic');
+	my $id = refaddr $timerfd;
 	my $timer = $self->{timers}{$id} = {
 		cb        => $cb,
 		after     => $after,
 		recurring => $recurring,
-		time      => steady_time + $after,
+		fd        => $timerfd,
 	};
-	
+
+	$after = 0.000_000_001 if $after == 0;
+
+	if ($recurring) {
+		$timerfd->set_timeout($after, $after);
+	} else {
+		$timerfd->set_timeout($after);
+	}
+
+	my $this = $self;
+	weaken $this;
+	$self->{io}{fileno $timerfd}{cb} = sub {
+		$this->remove($id) unless $recurring;
+		$this->_try('Timer', $cb) if $cb;
+	};
+	$self->watch($timerfd, 1, 0);
+
 	if (DEBUG) {
 		my $is_recurring = $recurring ? ' (recurring)' : '';
 		warn "-- Set timer $id after $after seconds$is_recurring\n";
