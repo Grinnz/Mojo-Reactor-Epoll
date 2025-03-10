@@ -64,9 +64,9 @@ sub remove {
 		}
 		warn "-- Removed IO watcher for $fd\n" if DEBUG;
 		return !!delete $self->{io}{$fd};
-	} elsif (my $timer = $self->{timers}{$remove}) {
+	} else {
 		warn "-- Removed timer $remove\n" if DEBUG;
-		$self->remove($timer->{fd});
+		$self->remove($self->{timers}{$remove}{fd}) if $self->{timers}{$remove};
 		return !!delete $self->{timers}{$remove};
 	}
 }
