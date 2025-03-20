@@ -11,7 +11,7 @@ use Scalar::Util qw/refaddr weaken/;
 
 use constant DEBUG => $ENV{MOJO_REACTOR_EPOLL_DEBUG} || 0;
 
-our $VERSION = '0.012';
+our $VERSION = '0.013';
 
 sub io {
 	my ($self, $handle, $cb) = @_;
